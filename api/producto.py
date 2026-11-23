@@ -40,7 +40,7 @@ from finnorte.caso_guia import asistente as caso_guia
 from finnorte.caso_guia import motor_demo
 from finnorte.caso_guia.herramientas import herramientas_caso_guia
 from finnorte.config import RAIZ, config
-
+from finnorte.herramientas import herramientas_triage, validador_triage, ejecutar_agente
 app = FastAPI(title="FinNorte · Producto (servicio con token + Gemini + agente)", version="2.0")
 auth = Autenticador(os.getenv("AUTH_DB", str(RAIZ / "bitacora" / "usuarios.db")))
 _ventanas: dict[str, list[float]] = {}
@@ -165,6 +165,29 @@ def ejecutar_variante(e: EntradaVariante, usuario: str = Depends(usuario_actual)
         raise ErrorHTTP(503, "Proveedor del modelo no disponible", str(err)[:200])
     return out
 
+class EntradaTriage(BaseModel):
+    log: str = Field(
+        min_length=10, 
+        max_length=2000, 
+        description="Descripción detallada del incidente, alerta o log a clasificar en el triage"
+    )
+    # Nota: Si el sistema() de tu Avance 1 pedía más datos (ej. "fecha", "origen"), 
+    # puedes agregarlos aquí abajo como atributos.
+
+@app.post("/v1/triage")
+def ejecutar_triage(e: EntradaTriage, usuario: str = Depends(usuario_actual)):
+    """Endpoint oficial de la variante v5-triage (Actividad 3)."""
+    try:
+        try:
+            # Convertimos el modelo Pydantic a diccionario para inyectarlo en tu sistema
+            out = variante.sistema(e.model_dump())
+        except NotImplementedError:
+            out = motor_demo.sistema(e.model_dump())
+    except ValueError as err:
+        raise ErrorHTTP(422, "Entrada inválida", str(err)[:200])
+    except llm.LLMError as err:
+        raise ErrorHTTP(503, "Proveedor del modelo no disponible", str(err)[:200])
+    return out
 
 class Tarea(BaseModel):
     tarea: str = Field(min_length=5, max_length=800)
@@ -175,7 +198,22 @@ class Decision(BaseModel):
 
 
 def _herramientas():
-    return herramientas_caso_guia()     # A4: agrega aquí las herramientas de TU variante
+    # A4: Conectamos las herramientas específicas de tu variante
+    return herramientas_triage()
+
+@app.post("/v1/agente")
+def agente(t: Tarea, usuario: str = Depends(usuario_actual)):
+    try:
+        # A4: Inyectamos tu propio ejecutor y tu validador de triage
+        return agente_servicio.iniciar(
+            t.tarea, 
+            usuario, 
+            _herramientas(), 
+            ejecutor=ejecutar_agente, 
+            validador=validador_triage
+        )
+    except llm.LLMError as e:
+        raise ErrorHTTP(503, "Proveedor del modelo no disponible", str(e)[:200])
 
 
 @app.post("/v1/agente")
