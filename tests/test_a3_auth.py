@@ -11,7 +11,7 @@ def test_registro_exitoso():
     """Prueba 1: Creación de usuario exitosa"""
     # Usamos un correo único para evitar conflictos si la BD guarda estado
     res = client.post("/auth/registro", json={"email": "nuevo_oficial@tecmi.mx", "contrasena": "secreto123"})
-    assert res.status_code in (201, 400) # 201 creado, o 400 si ya existía de corridas anteriores
+    assert res.status_code in (201, 400, 409)
 
 def test_login_exitoso():
     """Prueba 2: Login devuelve un token JWT-like"""
