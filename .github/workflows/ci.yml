@@ -20,6 +20,8 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.11", cache: pip }
       - run: pip install -r requirements.txt
+      - name: Crear archivo .env para GitHub
+        run: echo 'TOKEN_SECRET="un_secreto_muy_seguro_de_32_caracteres_minimo"' > .env
       - run: pytest -q
 
   contrato:
